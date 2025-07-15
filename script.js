@@ -44,30 +44,25 @@ document.addEventListener('DOMContentLoaded', () => {
         window.speechSynthesis.speak(utterance);
     }
     
-    // --- 主轉換按鈕的邏輯 ---
+    // --- 主轉換按鈕的邏輯 (無變化) ---
     convertBtn.addEventListener('click', () => {
         const inputText = cantoInput.value.trim();
         if (!inputText) {
             alert("請先輸入您要處理的普通話內容！");
             return;
         }
-
         const mandarinText = inputText;
         mandarinOutput.textContent = mandarinText;
-        
         try {
             if (typeof pinyinPro === 'undefined') {
                 throw new Error("拼音轉換庫 (pinyin-pro) 未能成功加載。");
             }
             pinyinOutput.innerHTML = createRubyHtml(mandarinText);
-
         } catch (error) {
             console.error("生成拼音標註時出錯:", error);
             alert("生成拼音標註時發生錯誤，請檢查輸入內容。");
             return; 
         }
-        
-        // --- 【修復點】: 確保將兩個區塊都顯示出來 ---
         resultArea.classList.remove('hidden');
         document.querySelector('.recorder-section').classList.remove('hidden');
     });
@@ -77,21 +72,50 @@ document.addEventListener('DOMContentLoaded', () => {
         speakText(mandarinOutput.textContent);
     });
 
-    // --- 功能4 & 5: 錄音與回放 (無變化) ---
+    // --- 【修復點】: 修改錄音的設定 ---
     async function setupAudio() {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
+                
+                // 檢查瀏覽器支援的音訊格式，優先使用 webm
+                const options = { mimeType: 'audio/webm' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    console.log(`${options.mimeType} is not Supported, falling back to ogg`);
+                    options.mimeType = 'audio/ogg; codecs=opus';
+                    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                         console.log(`${options.mimeType} is not Supported, falling back to wav`);
+                         options.mimeType = 'audio/wav'; // 作為最後的備用方案
+                         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                            console.log(`${options.mimeType} is not Supported`);
+                            options.mimeType = '';
+                         }
+                    }
+                }
+                
+                mediaRecorder = new MediaRecorder(stream, options);
+
+                mediaRecorder.ondataavailable = event => {
+                    // 確保有數據才加入
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
                 mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    if (audioChunks.length === 0) {
+                        recordingStatus.textContent = "錄音失敗，未偵測到音訊。";
+                        return;
+                    }
+                    // 使用 audioChunks 裡的第一個元素的 type，確保一致性
+                    const audioBlob = new Blob(audioChunks, { type: audioChunks[0].type });
                     const audioUrl = URL.createObjectURL(audioBlob);
                     audioPlayback.src = audioUrl;
                     audioPlayback.classList.remove('hidden');
                     audioChunks = [];
                 };
             } catch (err) {
+                console.error("無法獲取麥克風權限:", err);
                 recordingStatus.textContent = "錯誤：無法獲取麥克風。請檢查瀏覽器設定。";
                 recordBtn.disabled = true;
             }
@@ -100,8 +124,11 @@ document.addEventListener('DOMContentLoaded', () => {
             recordBtn.disabled = true;
         }
     }
+    // --- 錄音的開始和停止按鈕邏輯 (無變化) ---
     recordBtn.addEventListener('click', () => {
         if (!mediaRecorder) { alert('錄音功能尚未準備好或不被支持。'); return; }
+        // 每次開始前清空舊的數據
+        audioChunks = [];
         mediaRecorder.start();
         recordBtn.disabled = true;
         stopBtn.disabled = false;
@@ -109,39 +136,32 @@ document.addEventListener('DOMContentLoaded', () => {
         recordingStatus.textContent = "錄音中... 🔴";
     });
     stopBtn.addEventListener('click', () => {
-        mediaRecorder.stop();
-        recordBtn.disabled = false;
-        stopBtn.disabled = true;
-        recordingStatus.textContent = "錄音已停止。點擊播放器試聽。";
+        if (mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+            recordBtn.disabled = false;
+            stopBtn.disabled = true;
+            recordingStatus.textContent = "錄音已停止。點擊播放器試聽。";
+        }
     });
 
-    // --- 功能6: 儲存字詞 (無變化) ---
+    // --- 其他功能 (無變化) ---
     saveBtn.addEventListener('click', () => {
         const mandarin = mandarinOutput.textContent;
         const pinyinText = pinyinPro.pinyin(mandarin, { toneType: 'num', v: true });
-
         if (!mandarin) return;
-        
         const isDuplicate = savedWords.some(word => word.mandarin === mandarin);
         if (isDuplicate) { alert("此句已收藏！"); return; }
-        
         savedWords.push({ mandarin, pinyin: pinyinText });
         localStorage.setItem('savedWords', JSON.stringify(savedWords));
         alert("收藏成功！");
         renderReviewList();
     });
 
-    // --- 溫習列表渲染邏輯 (無變化) ---
     function renderReviewList(filter = 'all') {
         reviewList.innerHTML = '';
-        
         let wordsToRender = savedWords;
-        
         if (filter !== 'all') {
-            const conditions = {
-                'z_zh': ['z', 'zh'], 's_sh': ['s', 'sh'], 'c_ch': ['c', 'ch'],
-                'n_l': ['n', 'l'], 'ing_in': ['ing', 'in']
-            };
+            const conditions = { 'z_zh': ['z', 'zh'], 's_sh': ['s', 'sh'], 'c_ch': ['c', 'ch'], 'n_l': ['n', 'l'], 'ing_in': ['ing', 'in'] };
             const patterns = conditions[filter];
             if (patterns) {
                 wordsToRender = savedWords.filter(word => {
@@ -150,7 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         }
-
         if (wordsToRender.length === 0) {
             reviewList.innerHTML = `<p>暫無收藏。</p>`;
         } else {
@@ -158,29 +177,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const originalIndex = savedWords.findIndex(sw => sw.mandarin === word.mandarin);
                 const item = document.createElement('div');
                 item.className = 'review-item';
-                
-                item.innerHTML = `
-                    <div class="review-text-container ruby-container">
-                        ${createRubyHtml(word.mandarin)}
-                    </div>
-                    <div class="actions">
-                        <button class="review-speak-btn" title="朗讀此句" data-text="${word.mandarin}">🔊</button>
-                        <button class="delete-btn" title="刪除此句" data-index="${originalIndex}">❌</button>
-                    </div>
-                `;
+                item.innerHTML = `<div class="review-text-container ruby-container">${createRubyHtml(word.mandarin)}</div><div class="actions"><button class="review-speak-btn" title="朗讀此句" data-text="${word.mandarin}">🔊</button><button class="delete-btn" title="刪除此句" data-index="${originalIndex}">❌</button></div>`;
                 reviewList.appendChild(item);
             });
         }
-        
         savedCount.textContent = savedWords.length;
     }
 
-    // --- 溫習列表按鈕事件監聽 (無變化) ---
     reviewList.addEventListener('click', e => {
         const target = e.target;
-        if (target.classList.contains('review-speak-btn')) {
-            speakText(target.dataset.text);
-        }
+        if (target.classList.contains('review-speak-btn')) { speakText(target.dataset.text); }
         if (target.classList.contains('delete-btn')) {
             const indexToDelete = parseInt(target.dataset.index, 10);
             savedWords.splice(indexToDelete, 1);
@@ -190,7 +196,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    // --- 篩選按鈕事件 (無變化) ---
     filterControls.addEventListener('click', (e) => {
         if (e.target.tagName === 'BUTTON') {
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
@@ -199,7 +204,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- 初始化 (無變化) ---
     function init() {
         setupAudio();
         renderReviewList();
