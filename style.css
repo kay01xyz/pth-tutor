@@ -1,201 +1,171 @@
-document.addEventListener('DOMContentLoaded', () => {
+:root {
+    --primary-color: #007bff;
+    --secondary-color: #f0f8ff;
+    --text-color: #333;
+    --border-color: #ddd;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+}
 
-    // --- 元素選擇 (這部分不變) ---
-    const cantoInput = document.getElementById('cantoInput');
-    const convertBtn = document.getElementById('convertBtn');
-    const resultArea = document.getElementById('resultArea');
-    const mandarinOutput = document.getElementById('mandarinOutput');
-    const pinyinOutput = document.getElementById('pinyinOutput');
-    const speakBtn = document.getElementById('speakBtn');
-    const saveBtn = document.getElementById('saveBtn');
-    const recordBtn = document.getElementById('recordBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const recordingStatus = document.getElementById('recordingStatus');
-    const audioPlayback = document.getElementById('audioPlayback');
-    const reviewList = document.getElementById('reviewList');
-    const savedCount = document.getElementById('savedCount');
-    const filterControls = document.querySelector('.filter-controls');
-    
-    // --- 變數定義 (這部分不變) ---
-    let mediaRecorder;
-    let audioChunks = [];
-    let savedWords = JSON.parse(localStorage.getItem('savedWords')) || [];
-    
-    // --- 【修改點 1】: 改變按鈕的行為 ---
-    convertBtn.addEventListener('click', () => {
-        const inputText = cantoInput.value.trim();
-        if (!inputText) {
-            // 更改提示，因為現在是直接輸入普通話
-            alert("請先輸入您要處理的普通話內容！");
-            return;
-        }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.6;
+    background-color: #f4f7f9;
+    color: var(--text-color);
+    margin: 0;
+    padding: 20px;
+}
 
-        // 直接將輸入視為普通話，不再進行轉換
-        const mandarinText = inputText; 
-        mandarinOutput.textContent = mandarinText;
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    background-color: #fff;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
 
-        // --- 【修改點 2】: 為拼音轉換增加錯誤處理 ---
-        try {
-            // 檢查 pinyin-pro 庫是否已成功加載
-            if (typeof pinyinPro === 'undefined') {
-                throw new Error("拼音轉換庫 (pinyin-pro) 未能成功加載。\n\n請檢查：\n1. 您的網絡連接是否正常。\n2. 是否有廣告攔截等瀏覽器擴充功能阻擋了腳本。\n\n然後請刷新頁面重試。");
-            }
-            // 功能2: 拼音轉換
-            const pinyinText = pinyinPro.pinyin(mandarinText, { toneType: 'num', v: true });
-            pinyinOutput.textContent = pinyinText;
-        } catch (error) {
-            console.error("拼音轉換時出錯:", error);
-            alert(error.message); // 向用戶顯示友好的錯誤信息
-            return; // 如果出錯，則停止後續操作
-        }
+h1, h2 {
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 10px;
+    margin-top: 0;
+}
 
-        // --- 如果一切順利，則顯示結果和功能區塊 ---
-        resultArea.classList.remove('hidden');
-        document.querySelector('.recorder-section').classList.remove('hidden');
-    });
+h2 {
+    font-size: 1.5rem;
+    margin-top: 40px;
+}
 
-    // --- 功能3: 語音朗讀 (不變) ---
-    speakBtn.addEventListener('click', () => {
-        const textToSpeak = mandarinOutput.textContent;
-        if (!textToSpeak) return;
-        const utterance = new SpeechSynthesisUtterance(textToSpeak);
-        utterance.lang = 'zh-CN';
-        utterance.rate = 0.9;
-        window.speechSynthesis.speak(utterance);
-    });
+textarea#cantoInput {
+    width: 100%;
+    height: 100px;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid var(--border-color);
+    font-size: 1rem;
+    box-sizing: border-box;
+    margin-bottom: 15px;
+}
 
-    // --- 功能4 & 5: 錄音與回放 (不變，但增加了錯誤處理) ---
-    async function setupAudio() {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-                mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    audioPlayback.src = audioUrl;
-                    audioPlayback.classList.remove('hidden');
-                    audioChunks = [];
-                };
-            } catch (err) {
-                console.error("無法獲取麥克風權限:", err);
-                recordingStatus.textContent = "錯誤：無法獲取麥克風。請在瀏覽器設定中允許此網站使用麥克風。";
-                recordBtn.disabled = true;
-            }
-        } else {
-            recordingStatus.textContent = "抱歉，您的瀏覽器不支持錄音功能。";
-            recordBtn.disabled = true;
-        }
-    }
+button.btn-primary {
+    width: 100%;
+    padding: 12px 20px;
+    font-size: 1.1rem;
+    font-weight: bold;
+}
 
-    recordBtn.addEventListener('click', () => {
-        if (!mediaRecorder) {
-            alert('錄音功能尚未準備好或不被支持。');
-            return;
-        }
-        mediaRecorder.start();
-        recordBtn.disabled = true;
-        stopBtn.disabled = false;
-        audioPlayback.classList.add('hidden');
-        recordingStatus.textContent = "錄音中... 🔴";
-    });
+button, .btn-primary {
+    display: inline-block;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.1s;
+    background-color: var(--primary-color);
+    color: white;
+}
 
-    stopBtn.addEventListener('click', () => {
-        mediaRecorder.stop();
-        recordBtn.disabled = false;
-        stopBtn.disabled = true;
-        recordingStatus.textContent = "錄音已停止。點擊播放器試聽。";
-    });
+button:active {
+    transform: scale(0.98);
+}
 
-    // --- 【修改點 3】: 調整儲存邏輯 ---
-    saveBtn.addEventListener('click', () => {
-        const mandarin = mandarinOutput.textContent;
-        const pinyin = pinyinOutput.textContent;
+button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
 
-        if (!mandarin || !pinyin) return;
-        
-        const isDuplicate = savedWords.some(word => word.mandarin === mandarin);
-        if (isDuplicate) {
-            alert("此句已收藏！");
-            return;
-        }
-        
-        // 由於不再有廣東話原文，我們將'canto'欄位記錄為標記
-        savedWords.push({ canto: "(直接輸入)", mandarin, pinyin });
-        localStorage.setItem('savedWords', JSON.stringify(savedWords));
-        alert("收藏成功！");
-        renderReviewList();
-    });
+#resultArea {
+    margin-top: 20px;
+}
 
-    // --- 功能7: 溫習與篩選 (大部分不變) ---
-    function renderReviewList(filter = 'all') {
-        reviewList.innerHTML = '';
-        let wordsToRender = savedWords;
-        
-        if (filter !== 'all') {
-            const conditions = {
-                'z_zh': ['z', 'zh'], 's_sh': ['s', 'sh'], 'c_ch': ['c', 'ch'],
-                'n_l': ['n', 'l'], 'ing_in': ['ing', 'in']
-            };
-            const patterns = conditions[filter];
-            if (patterns) {
-                wordsToRender = savedWords.filter(word => {
-                    const pinyinSimple = word.pinyin.replace(/\d/g, '');
-                    return patterns.some(p => pinyinSimple.includes(p));
-                });
-            }
-        }
+.result-card {
+    background-color: var(--secondary-color);
+    border: 1px solid #e0f0ff;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
 
-        if (wordsToRender.length === 0) {
-            reviewList.innerHTML = `<p>沒有符合篩選條件的收藏。</p>`;
-        } else {
-             // 使用 filter 後的索引來刪除，避免刪除錯誤
-            wordsToRender.forEach(word => {
-                const originalIndex = savedWords.findIndex(sw => sw.mandarin === word.mandarin);
-                const item = document.createElement('div');
-                item.className = 'review-item';
-                item.innerHTML = `
-                    <div>
-                        <div class="mandarin">${word.mandarin}</div>
-                        <div class="pinyin">${word.pinyin}</div>
-                        <div class="canto">來源: ${word.canto}</div>
-                    </div>
-                    <div class="actions">
-                        <button class="delete-btn" data-index="${originalIndex}">刪除</button>
-                    </div>
-                `;
-                reviewList.appendChild(item);
-            });
-        }
-        
-        savedCount.textContent = savedWords.length;
+.result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
 
-        document.querySelectorAll('.delete-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const indexToDelete = parseInt(e.target.dataset.index, 10);
-                savedWords.splice(indexToDelete, 1);
-                localStorage.setItem('savedWords', JSON.stringify(savedWords));
-                renderReviewList(document.querySelector('.filter-btn.active').dataset.filter);
-            });
-        });
-    }
-    
-    filterControls.addEventListener('click', (e) => {
-        if (e.target.tagName === 'BUTTON') {
-            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-            e.target.classList.add('active');
-            renderReviewList(e.target.dataset.filter);
-        }
-    });
+.result-header .controls button {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--primary-color);
+    padding: 0 5px;
+}
 
-    // --- 初始化 (不變) ---
-    function init() {
-        setupAudio();
-        renderReviewList();
-        const activeButton = filterControls.querySelector('.filter-btn.active') || filterControls.querySelector('[data-filter="all"]');
-        activeButton.classList.add('active');
-    }
+#pinyinOutput {
+    color: #555;
+    font-style: italic;
+    font-size: 1.1rem;
+    letter-spacing: 0.5px;
+}
 
-    init();
-});
+.recorder-section, .review-section {
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.recorder-controls, .filter-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+#recordBtn { background-color: var(--success-color); }
+#stopBtn { background-color: var(--danger-color); }
+
+#audioPlayback {
+    width: 100%;
+    margin-top: 10px;
+}
+
+.filter-controls button {
+    background-color: #e9ecef;
+    color: #495057;
+    border: 1px solid #ced4da;
+    padding: 8px 15px;
+}
+
+.filter-controls button.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.review-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 15px;
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+    align-items: center;
+}
+.review-item:last-child { border-bottom: none; }
+
+.review-item .canto { font-size: 0.9rem; color: #666; }
+.review-item .mandarin { font-size: 1.1rem; font-weight: bold; }
+.review-item .pinyin { color: #555; }
+.review-item .actions button {
+    background: var(--danger-color);
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    border-radius: 5px;
+}
+
+.hidden {
+    display: none;
+}
