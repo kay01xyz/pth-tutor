@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>粵普通 Pro (原型)</title>
+    <!-- 修正了樣式表連結 -->
     <link rel="stylesheet" href="style.css">
-    <!-- 引入 pinyin-pro 庫來處理拼音轉換 -->
-    <script src="https://unpkg.com/pinyin-pro@3.18.5/dist/pinyin-pro.js"></script>
 </head>
 <body>
 
@@ -14,8 +13,10 @@
         <h1>粵普通 Pro 粵普學習助手</h1>
 
         <div class="main-converter">
-            <textarea id="cantoInput" placeholder="喺度用廣東話輸入，例如：搞掂、食咗飯未、今日好開心..."></textarea>
-            <button id="convertBtn" class="btn-primary">轉換為普通話</button>
+            <!-- 將輸入框改回美觀的 textarea -->
+            <textarea id="cantoInput" placeholder="請直接輸入普通話句子..."></textarea>
+            <!-- 更改按鈕文字，使其更貼合功能 -->
+            <button id="convertBtn" class="btn-primary">生成拼音與練習</button>
 
             <div id="resultArea" class="hidden">
                 <h2>轉換結果：</h2>
@@ -23,6 +24,7 @@
                     <div class="result-header">
                         <span>普通話說法</span>
                         <div class="controls">
+                            <!-- 將按鈕改回圖標，更美觀 -->
                             <button id="speakBtn" title="朗讀">🔊</button>
                             <button id="saveBtn" title="收藏此句">⭐</button>
                         </div>
@@ -61,9 +63,11 @@
                 <p>暫無收藏。</p>
             </div>
         </div>
-
     </div>
 
+    <!-- 關鍵改動：從本地加載拼音庫 -->
+    <script src="pinyin-pro.js"></script>
+    <!-- 再加載我們自己的主邏輯腳本 -->
     <script src="script.js"></script>
 </body>
 </html>
