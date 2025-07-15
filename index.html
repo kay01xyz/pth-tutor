@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>粵普通 Pro (原型)</title>
-    <!-- 修正了樣式表連結 -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,9 +12,7 @@
         <h1>粵普通 Pro 粵普學習助手</h1>
 
         <div class="main-converter">
-            <!-- 將輸入框改回美觀的 textarea -->
             <textarea id="cantoInput" placeholder="請直接輸入普通話句子..."></textarea>
-            <!-- 更改按鈕文字，使其更貼合功能 -->
             <button id="convertBtn" class="btn-primary">生成拼音與練習</button>
 
             <div id="resultArea" class="hidden">
@@ -24,7 +21,6 @@
                     <div class="result-header">
                         <span>普通話說法</span>
                         <div class="controls">
-                            <!-- 將按鈕改回圖標，更美觀 -->
                             <button id="speakBtn" title="朗讀">🔊</button>
                             <button id="saveBtn" title="收藏此句">⭐</button>
                         </div>
@@ -32,8 +28,9 @@
                     <p id="mandarinOutput"></p>
                 </div>
                 <div class="result-card">
-                    <div class="result-header"><span>拼音</span></div>
-                    <p id="pinyinOutput"></p>
+                    <div class="result-header"><span>拼音標註</span></div>
+                    <!-- 【修改點】: 將 <p> 標籤改為 <div>，以便容納複雜的 ruby 結構 -->
+                    <div id="pinyinOutput" class="ruby-container"></div>
                 </div>
             </div>
         </div>
@@ -65,9 +62,7 @@
         </div>
     </div>
 
-    <!-- 關鍵改動：從本地加載拼音庫 -->
     <script src="pinyin-pro.js"></script>
-    <!-- 再加載我們自己的主邏輯腳本 -->
     <script src="script.js"></script>
 </body>
 </html>
