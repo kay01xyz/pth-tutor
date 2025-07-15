@@ -21,23 +21,21 @@ document.addEventListener('DOMContentLoaded', () => {
     let audioChunks = [];
     let savedWords = JSON.parse(localStorage.getItem('savedWords')) || [];
 
-    // --- 【新增功能】: 生成 Ruby HTML 的核心函數 ---
-    function createRubyHtml(chinese, pinyinStr) {
-        // 使用 pinyin-pro 提供的 'all' 類型來獲取更詳細的資訊
+    // --- Ruby HTML 生成函數 (無變化) ---
+    function createRubyHtml(chinese) {
         const pinyinResult = pinyinPro.pinyin(chinese, { type: 'all', toneType: 'symbol' });
         let html = '';
         pinyinResult.forEach(item => {
             if (item.isZh) {
                 html += `<ruby>${item.origin}<rt>${item.pinyin}</rt></ruby>`;
             } else {
-                // 對於非中文字符，直接顯示
                 html += `<span>${item.origin}</span>`;
             }
         });
         return html;
     }
 
-    // --- 【新增功能】: 文字轉語音的通用函數 ---
+    // --- 文字轉語音函數 (無變化) ---
     function speakText(text) {
         if (!text) return;
         const utterance = new SpeechSynthesisUtterance(text);
@@ -46,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.speechSynthesis.speak(utterance);
     }
     
-    // --- 【修改點 1】: 主轉換按鈕的邏輯 ---
+    // --- 主轉換按鈕的邏輯 ---
     convertBtn.addEventListener('click', () => {
         const inputText = cantoInput.value.trim();
         if (!inputText) {
@@ -57,15 +55,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const mandarinText = inputText;
         mandarinOutput.textContent = mandarinText;
         
-        // 舊的拼音生成方式: pinyinOutput.textContent = pinyinText;
-        // 新的拼音生成方式，直接生成帶有 ruby 標籤的 HTML
-        pinyinOutput.innerHTML = createRubyHtml(mandarinText);
+        try {
+            if (typeof pinyinPro === 'undefined') {
+                throw new Error("拼音轉換庫 (pinyin-pro) 未能成功加載。");
+            }
+            pinyinOutput.innerHTML = createRubyHtml(mandarinText);
 
+        } catch (error) {
+            console.error("生成拼音標註時出錯:", error);
+            alert("生成拼音標註時發生錯誤，請檢查輸入內容。");
+            return; 
+        }
+        
+        // --- 【修復點】: 確保將兩個區塊都顯示出來 ---
         resultArea.classList.remove('hidden');
         document.querySelector('.recorder-section').classList.remove('hidden');
     });
 
-    // --- 【修改點 2】: 主朗讀按鈕調用通用函數 ---
+    // --- 主朗讀按鈕 (無變化) ---
     speakBtn.addEventListener('click', () => {
         speakText(mandarinOutput.textContent);
     });
@@ -108,10 +115,9 @@ document.addEventListener('DOMContentLoaded', () => {
         recordingStatus.textContent = "錄音已停止。點擊播放器試聽。";
     });
 
-    // --- 功能6: 儲存字詞 (儲存原始拼音字串) ---
+    // --- 功能6: 儲存字詞 (無變化) ---
     saveBtn.addEventListener('click', () => {
         const mandarin = mandarinOutput.textContent;
-        // 我們需要一個純文字版的拼音來做篩選，所以要生成它
         const pinyinText = pinyinPro.pinyin(mandarin, { toneType: 'num', v: true });
 
         if (!mandarin) return;
@@ -119,14 +125,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const isDuplicate = savedWords.some(word => word.mandarin === mandarin);
         if (isDuplicate) { alert("此句已收藏！"); return; }
         
-        // 儲存原始文本和用於篩選的拼音
         savedWords.push({ mandarin, pinyin: pinyinText });
         localStorage.setItem('savedWords', JSON.stringify(savedWords));
         alert("收藏成功！");
         renderReviewList();
     });
 
-    // --- 【修改點 3】: 全面重寫溫習列表的渲染邏輯 ---
+    // --- 溫習列表渲染邏輯 (無變化) ---
     function renderReviewList(filter = 'all') {
         reviewList.innerHTML = '';
         
@@ -154,7 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const item = document.createElement('div');
                 item.className = 'review-item';
                 
-                // 使用 Ruby HTML 顯示收藏的詞條，並加上朗讀和刪除按鈕
                 item.innerHTML = `
                     <div class="review-text-container ruby-container">
                         ${createRubyHtml(word.mandarin)}
@@ -171,14 +175,12 @@ document.addEventListener('DOMContentLoaded', () => {
         savedCount.textContent = savedWords.length;
     }
 
-    // --- 【新增功能】: 為收藏列表中的按鈕添加事件監聽（事件委派） ---
+    // --- 溫習列表按鈕事件監聽 (無變化) ---
     reviewList.addEventListener('click', e => {
         const target = e.target;
-        // 點擊了朗讀按鈕
         if (target.classList.contains('review-speak-btn')) {
             speakText(target.dataset.text);
         }
-        // 點擊了刪除按鈕
         if (target.classList.contains('delete-btn')) {
             const indexToDelete = parseInt(target.dataset.index, 10);
             savedWords.splice(indexToDelete, 1);
