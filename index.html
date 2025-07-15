@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粵普通 Pro (原型)</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- 引入 pinyin-pro 庫來處理拼音轉換 -->
+    <script src="https://unpkg.com/pinyin-pro@3.18.5/dist/pinyin-pro.js"></script>
+</head>
+<body>
+
+    <div class="container">
+        <h1>粵普通 Pro 粵普學習助手</h1>
+
+        <div class="main-converter">
+            <textarea id="cantoInput" placeholder="喺度用廣東話輸入，例如：搞掂、食咗飯未、今日好開心..."></textarea>
+            <button id="convertBtn" class="btn-primary">轉換為普通話</button>
+
+            <div id="resultArea" class="hidden">
+                <h2>轉換結果：</h2>
+                <div class="result-card">
+                    <div class="result-header">
+                        <span>普通話說法</span>
+                        <div class="controls">
+                            <button id="speakBtn" title="朗讀">🔊</button>
+                            <button id="saveBtn" title="收藏此句">⭐</button>
+                        </div>
+                    </div>
+                    <p id="mandarinOutput"></p>
+                </div>
+                <div class="result-card">
+                    <div class="result-header"><span>拼音</span></div>
+                    <p id="pinyinOutput"></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="recorder-section hidden">
+            <h2>跟讀練習</h2>
+            <div class="recorder-controls">
+                <button id="recordBtn">🎤 開始錄音</button>
+                <button id="stopBtn" disabled>⏹️ 停止錄音</button>
+            </div>
+            <p id="recordingStatus"></p>
+            <audio id="audioPlayback" controls class="hidden"></audio>
+        </div>
+
+        <div class="review-section">
+            <h2>溫習字詞庫 (已收藏 <span id="savedCount">0</span> 個)</h2>
+            <div class="filter-controls">
+                <span>篩選易混淆音：</span>
+                <button class="filter-btn" data-filter="all">全部</button>
+                <button class="filter-btn" data-filter="z_zh">z / zh</button>
+                <button class="filter-btn" data-filter="s_sh">s / sh</button>
+                <button class="filter-btn" data-filter="c_ch">c / ch</button>
+                <button class="filter-btn" data-filter="n_l">n / l</button>
+                <button class="filter-btn" data-filter="ing_in">ing / in</button>
+            </div>
+            <div id="reviewList">
+                <p>暫無收藏。</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
