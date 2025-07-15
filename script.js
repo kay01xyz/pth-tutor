@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- 元素選擇 ---
+    // --- 元素選擇 (無變化) ---
     const cantoInput = document.getElementById('cantoInput');
     const convertBtn = document.getElementById('convertBtn');
     const resultArea = document.getElementById('resultArea');
@@ -16,119 +16,91 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedCount = document.getElementById('savedCount');
     const filterControls = document.querySelector('.filter-controls');
     
-    // --- 變數定義 ---
+    // --- 變數定義 (無變化) ---
     let mediaRecorder;
     let audioChunks = [];
     let savedWords = JSON.parse(localStorage.getItem('savedWords')) || [];
 
-    // --- 粵普轉換詞典 (簡化版) ---
-    const cantoToMandoDict = {
-        "搞掂": "搞定",
-        "搞定": "办妥",
-        "食咗": "吃了",
-        "未": "没有",
-        "飯": "饭",
-        "晏晝": "下午",
-        "今日": "今天",
-        "尋日": "昨天",
-        "聽日": "明天",
-        "好開心": "很开心",
-        "係": "是",
-        "唔係": "不是",
-        "喺": "在",
-        "邊度": "哪里",
-        "乜嘢": "什么",
-        "點解": "为什么",
-        "幾多": "多少",
-        "嘅": "的",
-        "啲": "些",
-        "我": "我",
-        "你": "你",
-        "佢": "他",
-        "哋": "们"
-    };
-
-    // --- 功能1: 粵普轉換邏輯 ---
-    function convertCantoToMando(text) {
-        let convertedText = text;
-        // 為了簡單演示，我們從長到短替換詞語
-        const sortedKeys = Object.keys(cantoToMandoDict).sort((a, b) => b.length - a.length);
-        sortedKeys.forEach(key => {
-            const regex = new RegExp(key, "g");
-            convertedText = convertedText.replace(regex, cantoToMandoDict[key]);
+    // --- 【新增功能】: 生成 Ruby HTML 的核心函數 ---
+    function createRubyHtml(chinese, pinyinStr) {
+        // 使用 pinyin-pro 提供的 'all' 類型來獲取更詳細的資訊
+        const pinyinResult = pinyinPro.pinyin(chinese, { type: 'all', toneType: 'symbol' });
+        let html = '';
+        pinyinResult.forEach(item => {
+            if (item.isZh) {
+                html += `<ruby>${item.origin}<rt>${item.pinyin}</rt></ruby>`;
+            } else {
+                // 對於非中文字符，直接顯示
+                html += `<span>${item.origin}</span>`;
+            }
         });
-        return convertedText;
+        return html;
     }
 
-    // --- 事件監聽 ---
+    // --- 【新增功能】: 文字轉語音的通用函數 ---
+    function speakText(text) {
+        if (!text) return;
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+    }
+    
+    // --- 【修改點 1】: 主轉換按鈕的邏輯 ---
     convertBtn.addEventListener('click', () => {
         const inputText = cantoInput.value.trim();
         if (!inputText) {
-            alert("請先輸入廣東話內容！");
+            alert("請先輸入您要處理的普通話內容！");
             return;
         }
 
-        const mandarinText = convertCantoToMando(inputText);
+        const mandarinText = inputText;
         mandarinOutput.textContent = mandarinText;
-
-        // --- 功能2: 拼音轉換 ---
-        const pinyinText = pinyinPro.pinyin(mandarinText, { toneType: 'num', v: true });
-        pinyinOutput.textContent = pinyinText;
+        
+        // 舊的拼音生成方式: pinyinOutput.textContent = pinyinText;
+        // 新的拼音生成方式，直接生成帶有 ruby 標籤的 HTML
+        pinyinOutput.innerHTML = createRubyHtml(mandarinText);
 
         resultArea.classList.remove('hidden');
         document.querySelector('.recorder-section').classList.remove('hidden');
     });
 
-    // --- 功能3: 語音朗讀 ---
+    // --- 【修改點 2】: 主朗讀按鈕調用通用函數 ---
     speakBtn.addEventListener('click', () => {
-        const textToSpeak = mandarinOutput.textContent;
-        if (!textToSpeak) return;
-
-        const utterance = new SpeechSynthesisUtterance(textToSpeak);
-        utterance.lang = 'zh-CN'; // 指定語言為普通話
-        utterance.rate = 0.9; // 可調整語速
-        window.speechSynthesis.speak(utterance);
+        speakText(mandarinOutput.textContent);
     });
 
-    // --- 功能4 & 5: 錄音與回放 ---
+    // --- 功能4 & 5: 錄音與回放 (無變化) ---
     async function setupAudio() {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
-
-                mediaRecorder.ondataavailable = event => {
-                    audioChunks.push(event.data);
-                };
-
+                mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
                 mediaRecorder.onstop = () => {
                     const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
                     const audioUrl = URL.createObjectURL(audioBlob);
                     audioPlayback.src = audioUrl;
                     audioPlayback.classList.remove('hidden');
-                    audioChunks = []; // 清空以便下次錄音
+                    audioChunks = [];
                 };
             } catch (err) {
-                console.error("無法獲取麥克風權限:", err);
-                recordingStatus.textContent = "錯誤：無法獲取麥克風權限。請檢查瀏覽器設定。";
+                recordingStatus.textContent = "錯誤：無法獲取麥克風。請檢查瀏覽器設定。";
+                recordBtn.disabled = true;
             }
         } else {
             recordingStatus.textContent = "抱歉，您的瀏覽器不支持錄音功能。";
+            recordBtn.disabled = true;
         }
     }
-
     recordBtn.addEventListener('click', () => {
-        if (!mediaRecorder) {
-            alert('錄音功能尚未準備好或不被支持。');
-            return;
-        }
+        if (!mediaRecorder) { alert('錄音功能尚未準備好或不被支持。'); return; }
         mediaRecorder.start();
         recordBtn.disabled = true;
         stopBtn.disabled = false;
         audioPlayback.classList.add('hidden');
         recordingStatus.textContent = "錄音中... 🔴";
     });
-
     stopBtn.addEventListener('click', () => {
         mediaRecorder.stop();
         recordBtn.disabled = false;
@@ -136,33 +108,29 @@ document.addEventListener('DOMContentLoaded', () => {
         recordingStatus.textContent = "錄音已停止。點擊播放器試聽。";
     });
 
-
-    // --- 功能6: 儲存字詞 ---
+    // --- 功能6: 儲存字詞 (儲存原始拼音字串) ---
     saveBtn.addEventListener('click', () => {
-        const canto = cantoInput.value.trim();
         const mandarin = mandarinOutput.textContent;
-        const pinyin = pinyinOutput.textContent;
+        // 我們需要一個純文字版的拼音來做篩選，所以要生成它
+        const pinyinText = pinyinPro.pinyin(mandarin, { toneType: 'num', v: true });
 
-        if (!canto || !mandarin || !pinyin) return;
+        if (!mandarin) return;
         
-        // 檢查是否已存在
         const isDuplicate = savedWords.some(word => word.mandarin === mandarin);
-        if (isDuplicate) {
-            alert("此句已收藏！");
-            return;
-        }
-
-        savedWords.push({ canto, mandarin, pinyin });
+        if (isDuplicate) { alert("此句已收藏！"); return; }
+        
+        // 儲存原始文本和用於篩選的拼音
+        savedWords.push({ mandarin, pinyin: pinyinText });
         localStorage.setItem('savedWords', JSON.stringify(savedWords));
         alert("收藏成功！");
         renderReviewList();
     });
 
-    // --- 功能7: 溫習與篩選 ---
+    // --- 【修改點 3】: 全面重寫溫習列表的渲染邏輯 ---
     function renderReviewList(filter = 'all') {
         reviewList.innerHTML = '';
         
-        let filteredWords = savedWords;
+        let wordsToRender = savedWords;
         
         if (filter !== 'all') {
             const conditions = {
@@ -171,53 +139,56 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             const patterns = conditions[filter];
             if (patterns) {
-                filteredWords = savedWords.filter(word => {
-                    const pinyinSimple = word.pinyin.replace(/[0-9]/g, ''); // 移除音調數字
+                wordsToRender = savedWords.filter(word => {
+                    const pinyinSimple = word.pinyin.replace(/\d/g, '');
                     return patterns.some(p => pinyinSimple.includes(p));
                 });
             }
         }
 
-        if (filteredWords.length === 0) {
-            reviewList.innerHTML = `<p>沒有符合篩選條件的收藏。</p>`;
+        if (wordsToRender.length === 0) {
+            reviewList.innerHTML = `<p>暫無收藏。</p>`;
         } else {
-            filteredWords.forEach((word, index) => {
+            wordsToRender.forEach(word => {
+                const originalIndex = savedWords.findIndex(sw => sw.mandarin === word.mandarin);
                 const item = document.createElement('div');
                 item.className = 'review-item';
+                
+                // 使用 Ruby HTML 顯示收藏的詞條，並加上朗讀和刪除按鈕
                 item.innerHTML = `
-                    <div>
-                        <div class="mandarin">${word.mandarin}</div>
-                        <div class="pinyin">${word.pinyin}</div>
-                        <div class="canto">原文: ${word.canto}</div>
+                    <div class="review-text-container ruby-container">
+                        ${createRubyHtml(word.mandarin)}
                     </div>
                     <div class="actions">
-                        <button class="delete-btn" data-index="${index}">刪除</button>
+                        <button class="review-speak-btn" title="朗讀此句" data-text="${word.mandarin}">🔊</button>
+                        <button class="delete-btn" title="刪除此句" data-index="${originalIndex}">❌</button>
                     </div>
                 `;
                 reviewList.appendChild(item);
             });
         }
         
-        // 更新收藏數量
         savedCount.textContent = savedWords.length;
-
-        // 綁定刪除按鈕事件
-        document.querySelectorAll('.delete-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const indexToDelete = parseInt(e.target.dataset.index, 10);
-                // 這裡需要從原始數組中找到並刪除
-                const itemToDelete = filteredWords[indexToDelete];
-                const originalIndex = savedWords.findIndex(w => w.mandarin === itemToDelete.mandarin);
-                if (originalIndex > -1) {
-                    savedWords.splice(originalIndex, 1);
-                    localStorage.setItem('savedWords', JSON.stringify(savedWords));
-                    renderReviewList(filter); // 重新渲染當前篩選列表
-                }
-            });
-        });
     }
+
+    // --- 【新增功能】: 為收藏列表中的按鈕添加事件監聽（事件委派） ---
+    reviewList.addEventListener('click', e => {
+        const target = e.target;
+        // 點擊了朗讀按鈕
+        if (target.classList.contains('review-speak-btn')) {
+            speakText(target.dataset.text);
+        }
+        // 點擊了刪除按鈕
+        if (target.classList.contains('delete-btn')) {
+            const indexToDelete = parseInt(target.dataset.index, 10);
+            savedWords.splice(indexToDelete, 1);
+            localStorage.setItem('savedWords', JSON.stringify(savedWords));
+            const currentFilter = document.querySelector('.filter-btn.active').dataset.filter;
+            renderReviewList(currentFilter);
+        }
+    });
     
-    // 篩選按鈕事件
+    // --- 篩選按鈕事件 (無變化) ---
     filterControls.addEventListener('click', (e) => {
         if (e.target.tagName === 'BUTTON') {
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
@@ -226,11 +197,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- 初始化 ---
+    // --- 初始化 (無變化) ---
     function init() {
         setupAudio();
         renderReviewList();
-        filterControls.querySelector('[data-filter="all"]').classList.add('active');
+        const activeButton = filterControls.querySelector('.filter-btn.active') || filterControls.querySelector('[data-filter="all"]');
+        if(activeButton) activeButton.classList.add('active');
     }
 
     init();
