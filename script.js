@@ -38,6 +38,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 文字轉語音函數 (無變化) ---
     function speakText(text) {
         if (!text) return;
+        // 為了修復 iOS 上可能需要用戶互動才能播放的問題，每次都重新建立實例
+        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'zh-CN';
         utterance.rate = 0.9;
@@ -72,31 +74,40 @@ document.addEventListener('DOMContentLoaded', () => {
         speakText(mandarinOutput.textContent);
     });
 
-    // --- 【修復點】: 修改錄音的設定 ---
+    // --- 【修復點】: 全面重寫錄音設定，優先兼容 iPhone (Safari) ---
     async function setupAudio() {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
-                // 檢查瀏覽器支援的音訊格式，優先使用 webm
-                const options = { mimeType: 'audio/webm' };
-                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                    console.log(`${options.mimeType} is not Supported, falling back to ogg`);
-                    options.mimeType = 'audio/ogg; codecs=opus';
-                    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                         console.log(`${options.mimeType} is not Supported, falling back to wav`);
-                         options.mimeType = 'audio/wav'; // 作為最後的備用方案
-                         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                            console.log(`${options.mimeType} is not Supported`);
-                            options.mimeType = '';
-                         }
+                // 優先級列表，mp4 (aac) 是 Safari 的首選
+                const mimeTypes = [
+                    'audio/mp4',
+                    'audio/webm;codecs=opus',
+                    'audio/ogg; codecs=opus',
+                    'audio/wav'
+                ];
+                
+                let supportedMimeType = '';
+                for (const mimeType of mimeTypes) {
+                    if (MediaRecorder.isTypeSupported(mimeType)) {
+                        supportedMimeType = mimeType;
+                        console.log(`錄音格式確認: ${supportedMimeType}`);
+                        break;
                     }
                 }
-                
+
+                if (!supportedMimeType) {
+                    console.error("所有嘗試的音訊格式都不被您的瀏覽器支援。");
+                    recordingStatus.textContent = "錯誤：您的瀏覽器不支持任何可用的錄音格式。";
+                    recordBtn.disabled = true;
+                    return;
+                }
+
+                const options = { mimeType: supportedMimeType };
                 mediaRecorder = new MediaRecorder(stream, options);
 
                 mediaRecorder.ondataavailable = event => {
-                    // 確保有數據才加入
                     if (event.data.size > 0) {
                         audioChunks.push(event.data);
                     }
@@ -107,8 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         recordingStatus.textContent = "錄音失敗，未偵測到音訊。";
                         return;
                     }
-                    // 使用 audioChunks 裡的第一個元素的 type，確保一致性
-                    const audioBlob = new Blob(audioChunks, { type: audioChunks[0].type });
+                    const audioBlob = new Blob(audioChunks, { type: supportedMimeType });
                     const audioUrl = URL.createObjectURL(audioBlob);
                     audioPlayback.src = audioUrl;
                     audioPlayback.classList.remove('hidden');
@@ -116,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
             } catch (err) {
                 console.error("無法獲取麥克風權限:", err);
-                recordingStatus.textContent = "錯誤：無法獲取麥克風。請檢查瀏覽器設定。";
+                recordingStatus.textContent = "錯誤：無法獲取麥克風。請檢查瀏覽器及系統設定。";
                 recordBtn.disabled = true;
             }
         } else {
@@ -124,10 +134,9 @@ document.addEventListener('DOMContentLoaded', () => {
             recordBtn.disabled = true;
         }
     }
-    // --- 錄音的開始和停止按鈕邏輯 (無變化) ---
+    
     recordBtn.addEventListener('click', () => {
         if (!mediaRecorder) { alert('錄音功能尚未準備好或不被支持。'); return; }
-        // 每次開始前清空舊的數據
         audioChunks = [];
         mediaRecorder.start();
         recordBtn.disabled = true;
@@ -135,13 +144,14 @@ document.addEventListener('DOMContentLoaded', () => {
         audioPlayback.classList.add('hidden');
         recordingStatus.textContent = "錄音中... 🔴";
     });
+    
     stopBtn.addEventListener('click', () => {
-        if (mediaRecorder.state === "recording") {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
             mediaRecorder.stop();
-            recordBtn.disabled = false;
-            stopBtn.disabled = true;
-            recordingStatus.textContent = "錄音已停止。點擊播放器試聽。";
         }
+        recordBtn.disabled = false;
+        stopBtn.disabled = true;
+        recordingStatus.textContent = "錄音已停止。點擊播放器試聽。";
     });
 
     // --- 其他功能 (無變化) ---
@@ -185,7 +195,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     reviewList.addEventListener('click', e => {
-        const target = e.target;
+        const target = e.target.closest('button'); // 確保點擊到按鈕內部圖標也能觸發
+        if (!target) return;
         if (target.classList.contains('review-speak-btn')) { speakText(target.dataset.text); }
         if (target.classList.contains('delete-btn')) {
             const indexToDelete = parseInt(target.dataset.index, 10);
